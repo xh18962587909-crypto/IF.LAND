@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.db import ensure_runtime_directories, initialize_database
+from app.routers import outfit
 
 
 settings = get_settings()
@@ -29,6 +30,7 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory=settings.upload_path), name="uploads")
+app.include_router(outfit.router, prefix="/api/outfits", tags=["outfits"])
 
 
 @app.get("/health")
