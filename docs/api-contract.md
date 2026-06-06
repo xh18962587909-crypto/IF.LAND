@@ -162,12 +162,12 @@ GET /uploads/item_001.jpg
 
 ## 3. 衣橱模块
 
-### 3.1 上传衣物图片
+### 3.1 上传图片并识别衣物
 
 状态：待实现
 
 ```txt
-POST /api/wardrobe/items/upload
+POST /api/wardrobe/items/detect
 ```
 
 请求：
@@ -181,27 +181,132 @@ file: 图片文件
 
 ```json
 {
-  "id": 1,
-  "name": "白色衬衫",
-  "category": "top",
-  "color": "白色",
-  "season": ["spring", "summer"],
-  "style": ["通勤", "简约"],
-  "material": "棉",
-  "fit": "常规",
-  "usage_count": 0,
-  "image_url": "/uploads/item_001_original.jpg",
-  "cutout_image_url": "/uploads/item_001_cutout.jpg",
-  "created_at": "2026-06-06T12:00:00Z"
+  "upload_id": "upload_001",
+  "original_image_url": "/uploads/upload_001_original.jpg",
+  "detected_items": [
+    {
+      "temp_id": "det_001",
+      "name": "白色衬衫",
+      "category": "top",
+      "color": "白色",
+      "season": ["spring", "summer"],
+      "style": ["通勤", "简约"],
+      "material": "棉",
+      "fit": "常规",
+      "cutout_image_url": "/uploads/det_001_cutout.jpg",
+      "confidence": 0.91
+    },
+    {
+      "temp_id": "det_002",
+      "name": "浅蓝牛仔裤",
+      "category": "bottom",
+      "color": "浅蓝色",
+      "season": ["spring", "autumn"],
+      "style": ["休闲", "日常"],
+      "material": "牛仔",
+      "fit": "直筒",
+      "cutout_image_url": "/uploads/det_002_cutout.jpg",
+      "confidence": 0.87
+    }
+  ]
 }
 ```
 
 说明：
 
+- 这个接口只负责“识别”，不直接保存到衣橱。
+- 一张照片中有多件衣服时，`detected_items` 返回多个候选单品。
+- 前端需要展示候选卡片，让用户确认、修改标签或删除误识别项。
 - `cutout_image_url` 第一版可以直接返回原图地址。
 - AI 未接入前，后端可以使用 mock 标签。
 
-### 3.2 获取衣橱列表
+### 3.2 确认识别结果并批量保存
+
+状态：待实现
+
+```txt
+POST /api/wardrobe/items/batch-confirm
+```
+
+请求：
+
+```json
+{
+  "upload_id": "upload_001",
+  "items": [
+    {
+      "temp_id": "det_001",
+      "name": "白色衬衫",
+      "category": "top",
+      "color": "白色",
+      "season": ["spring", "summer"],
+      "style": ["通勤", "简约"],
+      "material": "棉",
+      "fit": "常规",
+      "cutout_image_url": "/uploads/det_001_cutout.jpg",
+      "save": true
+    },
+    {
+      "temp_id": "det_002",
+      "name": "浅蓝牛仔裤",
+      "category": "bottom",
+      "color": "浅蓝色",
+      "season": ["spring", "autumn"],
+      "style": ["休闲", "日常"],
+      "material": "牛仔",
+      "fit": "直筒",
+      "cutout_image_url": "/uploads/det_002_cutout.jpg",
+      "save": true
+    }
+  ]
+}
+```
+
+响应：
+
+```json
+{
+  "saved_items": [
+    {
+      "id": 1,
+      "name": "白色衬衫",
+      "category": "top",
+      "color": "白色",
+      "season": ["spring", "summer"],
+      "style": ["通勤", "简约"],
+      "material": "棉",
+      "fit": "常规",
+      "usage_count": 0,
+      "image_url": "/uploads/upload_001_original.jpg",
+      "cutout_image_url": "/uploads/det_001_cutout.jpg",
+      "created_at": "2026-06-06T12:00:00Z"
+    },
+    {
+      "id": 2,
+      "name": "浅蓝牛仔裤",
+      "category": "bottom",
+      "color": "浅蓝色",
+      "season": ["spring", "autumn"],
+      "style": ["休闲", "日常"],
+      "material": "牛仔",
+      "fit": "直筒",
+      "usage_count": 0,
+      "image_url": "/uploads/upload_001_original.jpg",
+      "cutout_image_url": "/uploads/det_002_cutout.jpg",
+      "created_at": "2026-06-06T12:00:00Z"
+    }
+  ],
+  "total_saved": 2
+}
+```
+
+说明：
+
+- `save: false` 的候选项不入库。
+- 用户修改过的字段以后端收到的请求为准。
+- `image_url` 保留原始上传图，`cutout_image_url` 用于衣橱卡片展示。
+
+### 3.3 获取衣橱列表
 
 状态：待实现
 
@@ -241,7 +346,7 @@ GET /api/wardrobe/items
 }
 ```
 
-### 3.3 获取单件衣物
+### 3.4 获取单件衣物
 
 状态：待实现
 
@@ -268,7 +373,7 @@ GET /api/wardrobe/items/{item_id}
 }
 ```
 
-### 3.4 修改衣物标签
+### 3.5 修改衣物标签
 
 状态：待实现
 
@@ -290,7 +395,7 @@ PATCH /api/wardrobe/items/{item_id}
 
 响应：返回修改后的衣物对象。
 
-### 3.5 删除衣物
+### 3.6 删除衣物
 
 状态：待实现
 
@@ -535,13 +640,13 @@ POST /api/purchase/convert-to-wardrobe
 
 ## 6. 前端调用示例
 
-### 6.1 上传图片
+### 6.1 上传图片并识别多件衣物
 
 ```ts
 const formData = new FormData()
 formData.append("file", file)
 
-const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/wardrobe/items/upload`, {
+const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/wardrobe/items/detect`, {
   method: "POST",
   body: formData,
 })
@@ -551,17 +656,37 @@ if (!response.ok) {
   throw new Error(error.detail?.message ?? "上传失败")
 }
 
-const item = await response.json()
+const detection = await response.json()
 ```
 
-### 6.2 获取衣橱
+### 6.2 确认并保存识别结果
+
+```ts
+const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/wardrobe/items/batch-confirm`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    upload_id: detection.upload_id,
+    items: detection.detected_items.map((item) => ({
+      ...item,
+      save: true,
+    })),
+  }),
+})
+
+const result = await response.json()
+```
+
+### 6.3 获取衣橱
 
 ```ts
 const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/wardrobe/items`)
 const data = await response.json()
 ```
 
-### 6.3 推荐穿搭
+### 6.4 推荐穿搭
 
 ```ts
 const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/outfits/recommend`, {
@@ -588,7 +713,8 @@ const data = await response.json()
 ```txt
 GET  /health
 GET  /ready
-POST /api/wardrobe/items/upload
+POST /api/wardrobe/items/detect
+POST /api/wardrobe/items/batch-confirm
 GET  /api/wardrobe/items
 POST /api/outfits/recommend
 POST /api/purchase/analyze
