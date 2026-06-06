@@ -1,57 +1,46 @@
 # 电脑 B：每日穿搭召回与多轮调整
 
-你负责让衣橱里的衣服“能被重新组织成今天能穿的方案”。新方案 v1.0 强调：前端先用白底素材拼搭配卡，再接模拟上身图，不要让展示完全依赖图像生成。
+一句话任务：你负责从衣橱里选衣服，生成“今天能穿”的 2-3 套搭配，并支持用户说“换一件”“不要黑色”“更正式一点”。
 
-## 1. 你的分支
+## 1. 你负责什么
+
+你不负责上传衣服，也不负责买前分析。
+
+你要做出这个效果：
+
+```txt
+数据库里已经有衣服
+-> 用户输入天气、气温、场景、风格、禁忌
+-> 后端召回合适单品
+-> 后端返回 2-3 套穿搭
+-> 每套有理由、分数、替换建议、mock 上身图
+-> 用户要求替换某类单品时，只替换那一类
+```
+
+## 2. 你的分支
 
 ```bash
 git checkout -b codex/outfit-recall
 ```
 
-## 2. 你要实现的接口
+## 3. 必须实现的接口
 
-第一优先级：
+必须完成：
 
 ```txt
 POST /api/outfits/recommend
 ```
 
-第二优先级：
+有时间再做：
 
 ```txt
 POST /api/outfits/replace
 POST /api/outfits/confirm
 ```
 
-## 3. 你负责的产品能力
+## 4. 必须修改/新增的文件
 
-输入包括：
-
-```txt
-天气 weather
-气温 temperature
-场景 occasion：通勤、上课、约会、旅行、拍照
-心情/偏好 mood：轻松、精致、低调、显瘦
-风格 style：浅色系、松弛感、韩系、正式一点
-禁忌 avoid：不要黑色、不要裙子、不穿高跟鞋
-指定单品 preferred_item_id
-```
-
-输出 2-3 套穿搭，每套包括：
-
-```txt
-衣物列表
-搭配理由
-适合场景
-舒适度 / 天气适配说明
-替换建议
-白底素材搭配卡所需图片 URL
-try_on_image_url mock
-```
-
-## 4. 推荐文件边界
-
-主要修改：
+主要文件：
 
 ```txt
 backend/app/routers/outfit.py
@@ -66,39 +55,126 @@ backend/tests/test_outfit.py
 ```txt
 backend/app/models.py
 backend/app/db.py
-docs/api-contract.md
 ```
 
-如果电脑 A 还没合并，测试里可以直接创建 SQLite item 数据。
+只允许最小修改：
 
-## 5. 实现细节
+```txt
+backend/app/main.py
+```
 
-`POST /api/outfits/recommend`：
+只在 `main.py` 里注册 router：
 
-1. 接收天气、气温、场景、风格、禁忌、指定单品。
-2. 从衣橱读取 item。
-3. 先过滤季节、场景、禁忌。
-4. 再按品类组合 top / bottom / outerwear / shoes / bag。
-5. 生成 2-3 套 outfit。
-6. 每套返回 `reason`、`score`、`items`、`replace_suggestions`、`try_on_image_url`。
+```python
+from app.routers import outfit
 
-`POST /api/outfits/replace`：
+app.include_router(outfit.router, prefix="/api/outfits", tags=["outfits"])
+```
 
-1. 接收当前搭配 item ids。
-2. 锁定不需要替换的 item。
-3. 只替换 `replace_category` 对应品类。
-4. 支持指令：“换一件外套”“不要黑色”“更正式一点”。
+不要修改：
 
-`POST /api/outfits/confirm`：
+```txt
+docs/api-contract.md
+docs/codex-collaboration/computer-a-wardrobe.md
+docs/codex-collaboration/computer-c-purchase-ai.md
+```
 
-1. 接收 `item_ids` 和 `feedback`。
-2. 记录今天穿了这套。
-3. 更新 `usage_count`。
-4. 如果反馈多次出现同一偏好，可以写入 mock 长期偏好。
+## 5. 硬性要求
 
-## 6. 推荐算法第一版
+### 5.1 recommend 请求必须支持
 
-不要接复杂模型，先规则化：
+```txt
+occasion
+temperature
+weather
+mood
+style
+avoid
+preferred_item_id
+```
+
+### 5.2 recommend 响应必须包含
+
+每个 outfit 必须包含：
+
+```txt
+id
+title
+reason
+score
+comfort_note
+scene_note
+items
+replace_suggestions
+try_on_image_url
+```
+
+每个 item 至少包含：
+
+```txt
+id
+name
+category
+color
+image_url
+```
+
+### 5.3 推荐逻辑要求
+
+必须做到：
+
+```txt
+avoid 里有黑色，就不能推荐 color=黑色 的衣物
+preferred_item_id 不为空时，推荐结果必须尽量包含该 item
+temperature/weather/season 至少参与打分说明
+occasion/style 至少参与筛选或打分
+每套 score 必须在 0-100
+衣橱不完整时不能崩溃
+```
+
+### 5.4 replace 接口要求
+
+`POST /api/outfits/replace` 必须做到：
+
+```txt
+只替换 replace_category 对应品类
+其他品类 item 保持不变
+新的 outfit 仍然包含 reason、score、items、try_on_image_url
+```
+
+### 5.5 confirm 接口要求
+
+`POST /api/outfits/confirm` 必须做到：
+
+```txt
+返回 confirmed=true
+记录 worn_record_id 或 mock record id
+尽量更新 usage_count
+```
+
+## 6. 允许 mock 的内容
+
+这些都可以 mock：
+
+```txt
+try_on_image_url
+长期偏好记忆
+复杂颜色协调算法
+复杂 embedding 召回
+```
+
+但穿搭推荐本身不能完全随机，必须能解释：
+
+```txt
+为什么适合场景
+为什么适合天气
+为什么避开了用户禁忌
+为什么推荐这件低利用率单品
+```
+
+## 7. 推荐算法第一版
+
+使用规则分数：
 
 ```txt
 基础分 50
@@ -111,52 +187,53 @@ docs/api-contract.md
 颜色协调 +5
 ```
 
-衣橱不完整时不要崩溃，可以返回部分搭配，并在 reason 里说明缺少鞋/包/外套数据。
+最终 score 限制在 0-100。
 
-## 7. 给这台电脑 Codex 的启动提示词
+## 8. 最终验收效果
 
-复制下面这段给电脑 B 的 Codex：
+做到下面这些才算完成：
 
 ```txt
-你现在负责 IF.LAND 项目的每日穿搭召回与多轮调整模块。
-
-请先阅读：
-1. docs/codex-collaboration/README.md
-2. docs/codex-collaboration/computer-b-outfit.md
-3. docs/api-contract.md
-4. backend/app/main.py
-5. backend/app/models.py
-
-请在分支 codex/outfit-recall 上开发。
-
-目标：
-- 实现 POST /api/outfits/recommend
-- 尽量实现 POST /api/outfits/replace
-- 尽量实现 POST /api/outfits/confirm
-
-要求：
-- 使用 FastAPI + Pydantic/SQLModel。
-- 用测试驱动开发，新增 backend/tests/test_outfit.py。
-- 第一版用规则召回和评分，不接真实 AI。
-- 支持天气、气温、场景、风格、禁忌、指定单品。
-- 返回 2-3 套 outfit，每套包含 reason、score、items、replace_suggestions、try_on_image_url。
-- try_on_image_url 可以先 mock。
-- 衣橱数据不足时也要返回可演示结果或清晰错误，不要崩溃。
-- 跑通 cd backend && source .venv/bin/activate && python -m pytest。
-- 完成后提交并 push 到 codex/outfit-recall。
-- 不要提交 PRD、.venv、SQLite db、上传图片。
+数据库里有白色上衣、蓝色裤子、黑色鞋子、米色外套
+用户请求 avoid=["黑色"] 时，返回 outfit 不包含黑色鞋子
+用户请求 occasion="通勤" 时，reason 里解释适合通勤
+用户请求 temperature="18-25℃" 时，comfort_note 里解释天气适配
+recommend 返回 2-3 套 outfit，或衣橱不足时返回清晰 fallback
+replace_category="outerwear" 时，只替换外套，其他 item id 不变
+confirm 后返回 confirmed=true
 ```
 
-## 8. 验收标准
+## 9. 测试方案
 
-必须验证：
+新增测试文件：
 
 ```txt
-衣橱有 top/bottom 时 recommend 返回 outfits 数组
-返回 2-3 套或在衣橱不足时给出清晰 fallback
-avoid 黑色时，不返回黑色 item
-replace_category = outerwear 时，只替换外套
-confirm 返回 confirmed = true，并更新 usage_count 或记录反馈
+backend/tests/test_outfit.py
+```
+
+必须写这些测试：
+
+```txt
+test_recommend_returns_outfits_from_seeded_wardrobe
+test_recommend_excludes_avoided_color
+test_recommend_includes_preferred_item_when_possible
+test_recommend_returns_required_display_fields
+test_recommend_handles_incomplete_wardrobe_without_crashing
+test_replace_only_changes_requested_category
+test_confirm_returns_confirmed_true
+test_outfit_score_is_between_0_and_100
+```
+
+每个测试的验收点：
+
+```txt
+recommend 状态码 200
+outfits 是数组
+outfits 长度在 1-3 之间
+每套 outfit 有 reason/score/items/replace_suggestions/try_on_image_url
+avoid 黑色时 items 中没有 color=黑色
+replace 后非替换品类 id 不变
+score >= 0 且 <= 100
 ```
 
 测试命令：
@@ -165,4 +242,81 @@ confirm 返回 confirmed = true，并更新 usage_count 或记录反馈
 cd backend
 source .venv/bin/activate
 python -m pytest
+```
+
+## 10. 手动联调 curl
+
+启动服务：
+
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+推荐穿搭：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/outfits/recommend \
+  -H "Content-Type: application/json" \
+  -d '{
+    "occasion": "通勤",
+    "temperature": "18-25℃",
+    "weather": "晴",
+    "mood": ["轻松"],
+    "style": ["浅色系"],
+    "avoid": ["黑色"],
+    "preferred_item_id": null
+  }'
+```
+
+替换外套：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/outfits/replace \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_item_ids": [1, 2, 3],
+    "replace_category": "outerwear",
+    "constraints": {
+      "occasion": "通勤",
+      "temperature": "18-25℃",
+      "avoid": ["黑色"],
+      "style": ["更正式一点"]
+    }
+  }'
+```
+
+确认穿搭：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/outfits/confirm \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_ids": [1, 2, 3],
+    "feedback": "like"
+  }'
+```
+
+## 11. 给这台电脑 Codex 的启动提示词
+
+```txt
+你负责 IF.LAND 的电脑 B：每日穿搭召回与多轮调整。
+
+先阅读：
+1. docs/codex-collaboration/README.md
+2. docs/codex-collaboration/computer-b-outfit.md
+3. docs/api-contract.md
+
+在分支 codex/outfit-recall 开发。
+
+只实现穿搭模块：
+- POST /api/outfits/recommend
+- POST /api/outfits/replace
+- POST /api/outfits/confirm
+
+必须写 backend/tests/test_outfit.py，并按文档里的测试方案覆盖。
+第一版使用规则召回和评分，try_on_image_url 先 mock。
+完成后运行 python -m pytest，提交并 push 到 codex/outfit-recall。
+不要提交 PRD、.venv、SQLite db、上传图片。
 ```
