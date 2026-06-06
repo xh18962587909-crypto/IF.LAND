@@ -1,0 +1,10 @@
+.DS_Store
+.superpowers/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+backend/.venv/
+backend/data/*.db
+backend/uploads/*
+!backend/uploads/.gitkeep
