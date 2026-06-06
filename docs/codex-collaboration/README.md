@@ -1,6 +1,6 @@
 # 三台 Codex 协同开发总览
 
-目标：三台电脑上的 Codex 同时开发《衣见》后端 MVP，围绕 `docs/api-contract.md` 完成第一批接口。
+目标：三台电脑上的 Codex 同时开发《衣见》后端 MVP。本文已根据本地补充文档 `“衣见”方案v1.0.docx` 更新。
 
 GitHub 仓库：
 
@@ -8,7 +8,30 @@ GitHub 仓库：
 https://github.com/xh18962587909-crypto/IF.LAND
 ```
 
-## 当前项目状态
+## 1. 产品共识
+
+《衣见》不是普通电子衣橱，而是围绕“今天穿什么”和“这件值不值得买”的个人衣橱 Agent。
+
+MVP 要证明一个闭环：
+
+```txt
+用户低成本上传图片
+-> 系统识别 1-3 件主要衣物
+-> 标准化成可管理的衣橱资产
+-> 每日穿搭可以召回这些资产
+-> 买前决策可以判断重复、缺口和可搭配性
+-> 必要时给出白底素材 / 模拟上身图 mock
+```
+
+核心工程取舍：
+
+```txt
+不要追求一次性完美识别整个衣柜。
+先证明衣物可以标准化入库、被召回、被推荐、被用于买前判断。
+模拟上身阶段定位为“穿搭氛围预览”，不要承诺高精度虚拟试衣。
+```
+
+## 2. 当前项目状态
 
 已完成：
 
@@ -20,9 +43,10 @@ SQLite 初始化
 /ready
 /uploads 静态文件访问
 API 接口文档
+三台 Codex 协作文档
 ```
 
-第一批要实现：
+第一批接口目标：
 
 ```txt
 POST /api/wardrobe/items/detect
@@ -32,15 +56,17 @@ POST /api/outfits/recommend
 POST /api/purchase/analyze
 ```
 
-## 三台电脑分工
+## 3. 三台电脑新版分工
 
-| 电脑 | 负责人方向 | 分支 | 文档 |
+| 电脑 | 方向 | 分支 | 文档 |
 | --- | --- | --- | --- |
-| 电脑 A | 衣橱模块 | `codex/wardrobe-api` | `docs/codex-collaboration/computer-a-wardrobe.md` |
-| 电脑 B | 今日穿搭模块 | `codex/outfit-api` | `docs/codex-collaboration/computer-b-outfit.md` |
-| 电脑 C | 买前决策 + AI mock | `codex/purchase-ai` | `docs/codex-collaboration/computer-c-purchase-ai.md` |
+| 电脑 A | 衣橱资产标准化与入库 | `codex/wardrobe-standardization` | `docs/codex-collaboration/computer-a-wardrobe.md` |
+| 电脑 B | 每日穿搭召回与多轮调整 | `codex/outfit-recall` | `docs/codex-collaboration/computer-b-outfit.md` |
+| 电脑 C | 买前决策、AI mock 与视觉生成兜底 | `codex/purchase-vision` | `docs/codex-collaboration/computer-c-purchase-ai.md` |
 
-## 每台电脑开始前都要做
+推荐当前这台已经初始化项目的电脑优先负责电脑 A 或最终集成；另外两台电脑分别负责 B/C。
+
+## 4. 每台电脑开始前都要做
 
 ```bash
 git clone https://github.com/xh18962587909-crypto/IF.LAND.git
@@ -52,25 +78,55 @@ pip install -r requirements.txt
 python -m pytest
 ```
 
-如果测试通过，再创建自己的分支。根据自己负责的电脑选择一个：
+如果测试通过，再按自己负责方向创建分支：
 
 ```bash
-git checkout -b codex/wardrobe-api
-git checkout -b codex/outfit-api
-git checkout -b codex/purchase-ai
+git checkout -b codex/wardrobe-standardization
+git checkout -b codex/outfit-recall
+git checkout -b codex/purchase-vision
 ```
 
-## 共同规则
+每台电脑只执行自己的那一条。
 
-1. 以 `docs/api-contract.md` 为接口真相，不要随便改接口字段。
+## 5. 共享数据结构原则
+
+每件衣服必须以数据库 `item_id` 为主键，不要用图片路径当唯一身份。
+
+衣物最小字段：
+
+```txt
+id
+name
+category
+color
+season
+style
+occasion
+material
+fit
+description
+source_type
+image_url
+cutout_image_url
+image_embedding/mock_embedding
+text_embedding/mock_embedding
+usage_count
+created_at
+```
+
+MVP 可以把 embedding 存成 JSON 数组或字符串占位；重点是保留字段和服务边界，方便后续替换真实模型。
+
+## 6. 共同规则
+
+1. 以 `docs/api-contract.md` 为接口真相；如果新方案要求补字段，先更新接口文档再写代码。
 2. 每台电脑只改自己模块的 router/service/test 文件。
-3. 如果必须改 `backend/app/models.py` 或新增共享 schema，先在群里说。
+3. 共享文件 `backend/app/models.py`、`backend/app/schemas.py`、`backend/app/services/vision_service.py` 容易冲突，改之前在群里说。
 4. 每个模块都要写测试，至少覆盖成功返回和一个基础错误/空数据场景。
-5. AI 第一版全部允许 mock，不要因为真实模型卡住接口开发。
+5. AI、白底图、embedding、模拟上身第一版都允许 mock，不要因为真实模型卡住接口开发。
 6. 不要提交本地 PRD、`.venv`、SQLite db、上传图片。
 7. 完成后 push 到自己的分支，不要直接覆盖别人的分支。
 
-## 推荐后端结构
+## 7. 推荐后端结构
 
 ```txt
 backend/app/
@@ -87,31 +143,41 @@ backend/app/
     outfit_service.py
     purchase_service.py
     vision_service.py
+    embedding_service.py
+    try_on_service.py
 ```
 
-当前仓库还没有 `schemas.py`。第一位需要 schema 的 Codex 可以创建它，但要尽量放通用响应模型，不要塞业务逻辑。
-
-## 交接格式
-
-每台电脑完成后，在聊天里发：
+服务职责：
 
 ```txt
-我负责的模块：
-完成的接口：
-新增/修改的文件：
-测试命令和结果：
-分支名：
-还需要别人配合的地方：
+vision_service.py: 图片理解、标签抽取、白底图 mock
+embedding_service.py: image/text embedding mock
+try_on_service.py: 模拟上身图 mock / prompt 构建
+wardrobe_service.py: 入库、查询、去重、低利用率
+outfit_service.py: 衣橱召回、搭配组合、替换
+purchase_service.py: 商品临时衣物、重复分析、购买分数
 ```
 
-## 合并建议
+## 8. 合并建议
 
 推荐合并顺序：
 
 ```txt
-电脑 A 衣橱模块
-电脑 C AI mock / 买前决策
-电脑 B 今日穿搭模块
+1. 电脑 A：衣橱资产标准化
+2. 电脑 C：AI mock / 买前决策 / 视觉兜底
+3. 电脑 B：每日穿搭召回
 ```
 
-原因：穿搭和买前决策都需要衣橱数据；先合衣橱，后面两个模块更容易接真实数据库。
+原因：B/C 都依赖衣橱 item 数据；C 的 `vision_service` 和 `try_on_service` 也会被 A/B 调用。
+
+## 9. 每台电脑完成后的交接格式
+
+```txt
+我负责的模块：
+分支名：
+完成的接口：
+新增/修改的文件：
+测试命令和结果：
+mock 了哪些 AI/图像能力：
+需要别人配合的地方：
+```

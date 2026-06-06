@@ -108,6 +108,17 @@ recommend, cautious, reject
 | `cautious` | 谨慎买 |
 | `reject` | 不建议买 |
 
+图片来源 `source_type`：
+
+```txt
+manual_upload, product_screenshot, outfit_photo, closet_photo, order_screenshot
+```
+
+说明：
+
+- `source_type` 用来降低冷启动成本，允许用户从商品截图、穿搭照、衣柜照、订单截图等入口逐步建立衣橱。
+- embedding 属于后端内部召回字段，MVP API 不强制返回给前端。
+
 ## 2. 基础接口
 
 ### 2.1 健康检查
@@ -175,6 +186,7 @@ POST /api/wardrobe/items/detect
 ```txt
 multipart/form-data
 file: 图片文件
+source_type: manual_upload | product_screenshot | outfit_photo | closet_photo | order_screenshot
 ```
 
 响应：
@@ -183,6 +195,7 @@ file: 图片文件
 {
   "upload_id": "upload_001",
   "original_image_url": "/uploads/upload_001_original.jpg",
+  "source_type": "closet_photo",
   "detected_items": [
     {
       "temp_id": "det_001",
@@ -191,8 +204,10 @@ file: 图片文件
       "color": "白色",
       "season": ["spring", "summer"],
       "style": ["通勤", "简约"],
+      "occasion": ["通勤", "上课"],
       "material": "棉",
       "fit": "常规",
+      "description": "白色常规版型衬衫，适合通勤和上课场景",
       "cutout_image_url": "/uploads/det_001_cutout.jpg",
       "confidence": 0.91
     },
@@ -203,8 +218,10 @@ file: 图片文件
       "color": "浅蓝色",
       "season": ["spring", "autumn"],
       "style": ["休闲", "日常"],
+      "occasion": ["上课", "周末", "旅行"],
       "material": "牛仔",
       "fit": "直筒",
+      "description": "浅蓝直筒牛仔裤，适合日常和轻松场景",
       "cutout_image_url": "/uploads/det_002_cutout.jpg",
       "confidence": 0.87
     }
@@ -233,6 +250,7 @@ POST /api/wardrobe/items/batch-confirm
 ```json
 {
   "upload_id": "upload_001",
+  "source_type": "closet_photo",
   "items": [
     {
       "temp_id": "det_001",
@@ -241,8 +259,10 @@ POST /api/wardrobe/items/batch-confirm
       "color": "白色",
       "season": ["spring", "summer"],
       "style": ["通勤", "简约"],
+      "occasion": ["通勤", "上课"],
       "material": "棉",
       "fit": "常规",
+      "description": "白色常规版型衬衫，适合通勤和上课场景",
       "cutout_image_url": "/uploads/det_001_cutout.jpg",
       "save": true
     },
@@ -253,8 +273,10 @@ POST /api/wardrobe/items/batch-confirm
       "color": "浅蓝色",
       "season": ["spring", "autumn"],
       "style": ["休闲", "日常"],
+      "occasion": ["上课", "周末", "旅行"],
       "material": "牛仔",
       "fit": "直筒",
+      "description": "浅蓝直筒牛仔裤，适合日常和轻松场景",
       "cutout_image_url": "/uploads/det_002_cutout.jpg",
       "save": true
     }
@@ -274,8 +296,11 @@ POST /api/wardrobe/items/batch-confirm
       "color": "白色",
       "season": ["spring", "summer"],
       "style": ["通勤", "简约"],
+      "occasion": ["通勤", "上课"],
       "material": "棉",
       "fit": "常规",
+      "description": "白色常规版型衬衫，适合通勤和上课场景",
+      "source_type": "closet_photo",
       "usage_count": 0,
       "image_url": "/uploads/upload_001_original.jpg",
       "cutout_image_url": "/uploads/det_001_cutout.jpg",
@@ -288,15 +313,25 @@ POST /api/wardrobe/items/batch-confirm
       "color": "浅蓝色",
       "season": ["spring", "autumn"],
       "style": ["休闲", "日常"],
+      "occasion": ["上课", "周末", "旅行"],
       "material": "牛仔",
       "fit": "直筒",
+      "description": "浅蓝直筒牛仔裤，适合日常和轻松场景",
+      "source_type": "closet_photo",
       "usage_count": 0,
       "image_url": "/uploads/upload_001_original.jpg",
       "cutout_image_url": "/uploads/det_002_cutout.jpg",
       "created_at": "2026-06-06T12:00:00Z"
     }
   ],
-  "total_saved": 2
+  "total_saved": 2,
+  "duplicate_warnings": [
+    {
+      "temp_id": "det_001",
+      "similar_item_id": 9,
+      "message": "可能和已有白色衬衫重复"
+    }
+  ]
 }
 ```
 
@@ -320,6 +355,7 @@ GET /api/wardrobe/items
 | --- | --- | --- | --- |
 | `category` | string | `top` | 按衣物大类筛选 |
 | `color` | string | `白色` | 按颜色筛选 |
+| `source_type` | string | `closet_photo` | 按图片来源筛选 |
 | `low_usage` | boolean | `true` | 只看低利用率单品 |
 
 响应：
@@ -334,8 +370,11 @@ GET /api/wardrobe/items
       "color": "白色",
       "season": ["spring", "summer"],
       "style": ["通勤", "简约"],
+      "occasion": ["通勤", "上课"],
       "material": "棉",
       "fit": "常规",
+      "description": "白色常规版型衬衫，适合通勤和上课场景",
+      "source_type": "closet_photo",
       "usage_count": 0,
       "image_url": "/uploads/item_001_original.jpg",
       "cutout_image_url": "/uploads/item_001_cutout.jpg",
@@ -364,8 +403,11 @@ GET /api/wardrobe/items/{item_id}
   "color": "白色",
   "season": ["spring", "summer"],
   "style": ["通勤", "简约"],
+  "occasion": ["通勤", "上课"],
   "material": "棉",
   "fit": "常规",
+  "description": "白色常规版型衬衫，适合通勤和上课场景",
+  "source_type": "closet_photo",
   "usage_count": 0,
   "image_url": "/uploads/item_001_original.jpg",
   "cutout_image_url": "/uploads/item_001_cutout.jpg",
@@ -429,6 +471,7 @@ POST /api/outfits/recommend
   "occasion": "通勤",
   "temperature": "18-25℃",
   "weather": "晴",
+  "mood": ["轻松", "精致"],
   "style": ["浅色系", "显瘦"],
   "avoid": ["黑色"],
   "preferred_item_id": null
@@ -445,6 +488,8 @@ POST /api/outfits/recommend
       "title": "浅色通勤搭配",
       "reason": "适合 18-25℃ 通勤场景，整体浅色，不包含黑色，并激活了一件低利用率单品。",
       "score": 86,
+      "comfort_note": "适合 18-25℃ 晴天，不需要厚外套。",
+      "scene_note": "适合通勤、上课和轻正式场景。",
       "items": [
         {
           "id": 1,
@@ -460,7 +505,18 @@ POST /api/outfits/recommend
           "color": "浅蓝色",
           "image_url": "/uploads/item_002_cutout.jpg"
         }
-      ]
+      ],
+      "replace_suggestions": [
+        {
+          "category": "outerwear",
+          "label": "换一件外套"
+        },
+        {
+          "category": "shoes",
+          "label": "鞋子换舒服点"
+        }
+      ],
+      "try_on_image_url": "/uploads/mock_try_on_001.jpg"
     }
   ]
 }
@@ -498,6 +554,8 @@ POST /api/outfits/replace
     "title": "更正式的通勤搭配",
     "reason": "保留下装和鞋子，只替换上衣，避开黑色并提高正式感。",
     "score": 88,
+    "comfort_note": "适合 18-25℃ 室内外通勤。",
+    "scene_note": "比上一套更正式。",
     "items": [
       {
         "id": 4,
@@ -513,7 +571,14 @@ POST /api/outfits/replace
         "color": "浅蓝色",
         "image_url": "/uploads/item_002_cutout.jpg"
       }
-    ]
+    ],
+    "replace_suggestions": [
+      {
+        "category": "outerwear",
+        "label": "换一件外套"
+      }
+    ],
+    "try_on_image_url": "/uploads/mock_try_on_002.jpg"
   }
 }
 ```
@@ -571,7 +636,12 @@ file: 商品图片
     "color": "灰色",
     "season": ["spring", "autumn"],
     "style": ["通勤", "正式"],
-    "image_url": "/uploads/candidate_001.jpg"
+    "occasion": ["通勤", "面试", "正式场合"],
+    "material": "聚酯纤维",
+    "fit": "宽松",
+    "description": "灰色宽松西装外套，适合春秋通勤和正式场景",
+    "image_url": "/uploads/candidate_001.jpg",
+    "cutout_image_url": "/uploads/candidate_001_cutout.jpg"
   },
   "decision": "cautious",
   "decision_text": "谨慎买",
@@ -606,10 +676,14 @@ file: 商品图片
           "category": "top",
           "image_url": "/uploads/item_001_cutout.jpg"
         }
-      ]
+      ],
+      "try_on_image_url": "/uploads/mock_try_on_purchase_001.jpg",
+      "try_on_prompt": "模特全身照，站姿自然，干净背景，柔和自然光。穿搭包括灰色西装外套、白色衬衫和浅蓝牛仔裤。风格为通勤、简约、轻正式。画面用途是穿搭氛围预览，不追求精确虚拟试衣。"
     }
   ],
-  "alternative_plan": "可以先用已有深灰西装外套搭配白色衬衫和浅蓝牛仔裤，效果接近。"
+  "alternative_plan": "可以先用已有深灰西装外套搭配白色衬衫和浅蓝牛仔裤，效果接近。",
+  "try_on_image_url": "/uploads/mock_try_on_purchase_001.jpg",
+  "try_on_prompt": "模特全身照，站姿自然，干净背景，柔和自然光。穿搭包括灰色西装外套、白色衬衫和浅蓝牛仔裤。风格为通勤、简约、轻正式。画面用途是穿搭氛围预览，不追求精确虚拟试衣。"
 }
 ```
 
@@ -631,7 +705,12 @@ POST /api/purchase/convert-to-wardrobe
     "color": "灰色",
     "season": ["spring", "autumn"],
     "style": ["通勤", "正式"],
-    "image_url": "/uploads/candidate_001.jpg"
+    "occasion": ["通勤", "面试", "正式场合"],
+    "material": "聚酯纤维",
+    "fit": "宽松",
+    "description": "灰色宽松西装外套，适合春秋通勤和正式场景",
+    "image_url": "/uploads/candidate_001.jpg",
+    "cutout_image_url": "/uploads/candidate_001_cutout.jpg"
   }
 }
 ```
@@ -645,6 +724,7 @@ POST /api/purchase/convert-to-wardrobe
 ```ts
 const formData = new FormData()
 formData.append("file", file)
+formData.append("source_type", "closet_photo")
 
 const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/wardrobe/items/detect`, {
   method: "POST",
@@ -698,6 +778,7 @@ const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/outfits/r
     occasion: "通勤",
     temperature: "18-25℃",
     weather: "晴",
+    mood: ["轻松"],
     style: ["浅色系"],
     avoid: ["黑色"],
   }),
