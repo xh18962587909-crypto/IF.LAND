@@ -458,7 +458,7 @@ DELETE /api/wardrobe/items/{item_id}
 
 ### 4.1 推荐今日穿搭
 
-状态：待实现
+状态：已实现（规则召回 + mock 上身图）
 
 ```txt
 POST /api/outfits/recommend
@@ -522,9 +522,16 @@ POST /api/outfits/recommend
 }
 ```
 
+说明：
+
+- 第一版从已保存的衣橱单品中按 `occasion`、`temperature`、`weather`、`style`、`avoid`、`preferred_item_id` 做规则召回和打分。
+- `avoid` 会过滤命中的颜色、名称、品类或风格；例如 `avoid: ["黑色"]` 不会返回黑色单品。
+- 衣橱品类不完整时仍返回可执行的部分搭配，并在 `reason` 里说明缺少的数据。
+- `try_on_image_url` 当前是 mock 结果，后续可替换为真实上身图服务。
+
 ### 4.2 替换搭配中的单品
 
-状态：待实现
+状态：已实现
 
 ```txt
 POST /api/outfits/replace
@@ -539,6 +546,8 @@ POST /api/outfits/replace
   "constraints": {
     "occasion": "通勤",
     "temperature": "18-25℃",
+    "weather": "晴",
+    "mood": ["轻松"],
     "avoid": ["黑色"],
     "style": ["更正式一点"]
   }
@@ -583,9 +592,14 @@ POST /api/outfits/replace
 }
 ```
 
+说明：
+
+- `replace_category` 只会替换对应品类，其他品类的 `item id` 保持不变。
+- 找不到可替换单品时，接口仍返回当前搭配，并给出可展示的 `reason`、`score`、`try_on_image_url`。
+
 ### 4.3 确认今天穿这套
 
-状态：待实现
+状态：已实现（MVP mock 穿着记录）
 
 ```txt
 POST /api/outfits/confirm
@@ -605,9 +619,16 @@ POST /api/outfits/confirm
 ```json
 {
   "confirmed": true,
-  "worn_record_id": 1
+  "worn_record_id": 1,
+  "feedback": "like",
+  "item_ids": [1, 2, 3]
 }
 ```
+
+说明：
+
+- MVP 阶段返回 mock `worn_record_id`，用于前端完成“今天穿这套”的闭环。
+- 后续如增加穿着记录表，可在这里落库并更新单品使用次数。
 
 ## 5. 买前决策模块
 
@@ -781,6 +802,48 @@ const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/outfits/r
     mood: ["轻松"],
     style: ["浅色系"],
     avoid: ["黑色"],
+  }),
+})
+
+const data = await response.json()
+```
+
+### 6.5 替换搭配单品
+
+```ts
+const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/outfits/replace`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    current_item_ids: [1, 2, 3],
+    replace_category: "shoes",
+    constraints: {
+      occasion: "通勤",
+      temperature: "18-25℃",
+      weather: "晴",
+      mood: ["轻松"],
+      style: ["浅色系"],
+      avoid: ["黑色"],
+    },
+  }),
+})
+
+const data = await response.json()
+```
+
+### 6.6 确认今日穿搭
+
+```ts
+const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/outfits/confirm`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    item_ids: [1, 2, 3],
+    feedback: "like",
   }),
 })
 
